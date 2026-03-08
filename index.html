@@ -1,0 +1,299 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>owo - Furry Institute of Technology</title>
+    <link rel="stylesheet" href="https://unpkg.com/7.css">
+    <style>
+        .background {
+            background-image: url('background.png');
+            background-color: rgba(0, 0, 0, 0);
+            background-size: cover;
+            background-position: center;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: -1;
+        }
+
+        .background::before {
+            content: "";
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-size: cover;
+            background-repeat: no-repeat;
+            background-position: center;
+            z-index: -1
+        }
+        .window {
+            --window-background-color: #5b6ea5b5;
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            opacity: 0;
+            animation: fade-in 0.3s cubic-bezier(.22,.33,.16,.93) forwards, up 0.3s cubic-bezier(.22,.33,.16,.93) forwards;
+        }
+        .hidden {
+            animation: fade-out 0.2s forwards, down 0.3s forwards;
+        }
+        @keyframes fade-in {
+            from {
+                opacity: 0;
+            }
+            to {
+                opacity: 1;
+            }
+        }
+        @keyframes up {
+            from {
+                transform: translate(-50%, -50%) scale(0.9);
+            }
+            to {
+                transform: translate(-50%, -50%) scale(1);
+            }
+        }
+        @keyframes down {
+            from {
+                transform: translate(-50%, -50%) scale(1);
+            }
+            to {
+                transform: translate(-50%, -50%) scale(0.97);
+            }
+        }
+        @keyframes fade-out {
+            from {
+                opacity: 1;
+            }
+            to {
+                opacity: 0;
+            }
+        }
+        .dialog-button {
+            margin: 5px;
+        }
+    </style>
+    <script>
+        document.addEventListener("DOMContentLoaded", function() {
+            let activeDialogs = {}; // Object to keep track of active dialogs
+    
+            function closewindow() {
+                const mainWindow = document.querySelector(".window.glass");
+                if (mainWindow) {
+                    mainWindow.classList.add("hidden");
+                    mainWindow.addEventListener("animationend", function() {
+                        mainWindow.remove();
+                    });
+                }
+            }
+            
+            function makeDraggable(windowElement) {
+                let isDragging = false;
+                let offsetX = 0;
+                let offsetY = 0;
+
+                const titleBar = windowElement.querySelector(".title-bar");
+
+                titleBar.addEventListener("mousedown", function(event) {
+                    isDragging = true;
+
+                    // Ensure the window has absolute positioning
+                    const rect = windowElement.getBoundingClientRect();
+                    windowElement.style.position = "absolute";
+                    windowElement.style.left = `${rect.left}px`;
+                    windowElement.style.top = `${rect.top}px`;
+
+                    offsetX = event.clientX - rect.left;
+                    offsetY = event.clientY - rect.top;
+
+                    // Prevent text selection while dragging
+                    document.body.style.userSelect = "none";
+                });
+
+                document.addEventListener("mousemove", function(event) {
+                    if (isDragging) {
+                        const newX = event.clientX - offsetX;
+                        const newY = event.clientY - offsetY;
+                        windowElement.style.left = `${newX}px`;
+                        windowElement.style.top = `${newY}px`;
+                    }
+                });
+
+                document.addEventListener("mouseup", function() {
+                    if (isDragging) {
+                        isDragging = false;
+                        document.body.style.userSelect = ""; // Re-enable text selection
+                    }
+                });
+            }
+    
+            function openDialog(type) {
+                if (activeDialogs[type]) {
+                    return;
+                }
+    
+                const allWindows = document.querySelectorAll(".window");
+                allWindows.forEach(window => {
+                    window.classList.remove("active");
+                });
+    
+                const newWindow = document.createElement("div");
+                newWindow.className = "window active";
+                newWindow.style.maxWidth = "300px";
+    
+                if (type === "Debug") {
+                    newWindow.innerHTML = `
+                        <div class="title-bar" style="max-width: 100%">
+                            <div class="title-bar-text">System Debug</div>
+                            <div class="title-bar-controls">
+                                <button aria-label="Close" onclick="this.closest('.window').classList.add('hidden')"></button>
+                            </div>
+                        </div>
+                        <div class="window-body has-space">
+                            <p>Your IP Address: <span id="ip-address"></span></p>
+                            <p>AS<span id="asnum"></span><span id="as"></span></p>
+                            <p>User Agent: ${navigator.userAgent}</p>
+                            <button onclick="copyToClipboard()" class="dialog-button">Copy Debug Info</button>
+                        </div>
+                    `;
+
+                    fetch("https://ip.wtf", { headers: { Accept: "application/json" } })
+                        .then(response => response.json())
+                        .then(data => {
+                            const ipAddress = data.ip;
+                            const as = data.as.number + " " + data.as.name;
+                            const ipAddressElement = newWindow.querySelector("#ip-address");
+                            const asElement = newWindow.querySelector("#as");
+                            const asNumElement = newWindow.querySelector("#asnum");
+                            ipAddressElement.textContent = ipAddress;
+                            asElement.textContent = as;
+                        })
+                        .catch(error => {
+                            console.error("Error fetching IP address:", error);
+                            const ipAddressElement = newWindow.querySelector("#ip-address");
+                            const asElement = newWindow.querySelector("#as");
+                            const asNumElement = newWindow.querySelector("#asnum");
+                            ipAddressElement.textContent = "Error fetching IP address.";
+                            asElement.textContent = "";
+                        });
+
+                    window.copyToClipboard = function() {
+                        const debugInfo = `owo Debug @ ${new Date().toLocaleString()}: IP Address: ${newWindow.querySelector("#ip-address").textContent}\nAS${newWindow.querySelector("#asnum").textContent}: ${newWindow.querySelector("#as").textContent} \nUser Agent: ${navigator.userAgent}`;
+                        navigator.clipboard.writeText(debugInfo);
+                    };
+
+                } else if (type === "Network Status") {
+                    newWindow.innerHTML = `
+                        <div class="title-bar" style="max-width: 100%">
+                            <div class="title-bar-text">Network Health</div>
+                            <div class="title-bar-controls">
+                                <button aria-label="Close" onclick="this.closest('.window').classList.add('hidden')"></button>
+                            </div>
+                        </div>
+                        <div class="window-body has-space">
+                            
+                            <p id="loading">Loading server status...</p>
+                            <div id="server-list"></div>
+                        </div>
+                    `;
+                    const serverList = newWindow.querySelector("#server-list");
+                    fetch("https://h-api.screenshot.download")
+                        .then(response => response.json())
+                        .then(data => {
+                            const healthScore = data.health_score;
+                            const listItem = document.createElement("p");
+                            listItem.textContent = `Health Score: ${healthScore}`;
+                            serverList.appendChild(listItem);
+                            newWindow.querySelector("#loading").remove();
+                        })
+                        .catch(error => {
+                            console.error("Error fetching server status:", error);
+                            const listItem = document.createElement("p");
+                            listItem.textContent = "Error fetching server status. (Too many requests?)";
+                            newWindow.querySelector("#loading").remove();
+                            serverList.appendChild(listItem);
+                        });
+                }
+    
+                document.body.appendChild(newWindow);
+                newWindow.classList.add("active");
+
+                // Make the new window draggable
+                makeDraggable(newWindow);
+    
+                const closeButton = newWindow.querySelector('[aria-label="Close"]');
+                closeButton.addEventListener("click", function() {
+                    newWindow.classList.add("hidden");
+                    newWindow.addEventListener("animationend", function() {
+                        newWindow.remove();
+                        delete activeDialogs[type];
+                    });
+                });
+    
+                activeDialogs[type] = newWindow;
+            }
+    
+            window.openSystemDebugDialog = function() {
+                openDialog("Debug");
+            };
+    
+            window.openNetworkStatusDialog = function() {
+                openDialog("Network Status");
+            };
+    
+            window.closewindow = closewindow;
+
+            // Make the main "owo" window draggable
+            const mainWindow = document.querySelector(".window.glass");
+            if (mainWindow) {
+                makeDraggable(mainWindow);
+            }
+    
+            document.addEventListener("click", function(event) {
+                const windows = document.querySelectorAll(".window");
+                windows.forEach(window => {
+                    if (!window.contains(event.target)) {
+                        window.classList.remove("active");
+                    } else {
+                        window.classList.add("active");
+                    }
+                });
+            });
+        });
+    </script>
+    
+</head>
+<body>
+
+    <div class="background">
+        <div class="window glass active" style="--window-background-color: #5b6ea5b5;">
+            <div class="title-bar">
+                <div class="title-bar-text">owo</div>
+                <div class="title-bar-controls">
+                    <button onclick="closewindow()" aria-label="Close"></button>
+                </div>
+            </div>
+            
+            <div class="window-body has-space">
+                <p>owo, Furry Institute of Technology's US Interconnected network TEST1</p>
+                <p>A research institute dedicated to Software Engineering, Computer Science, and Furries. We operate a small educational/testing cloud network for people who :3</p>
+                <p>Providing High-Bandwidth Interconnected cloud solutions for Education and Hobbyists</p>
+                <p>Learn more about our mission @ <a href="https://furry.institute" target="_blank">furry.institute </a></p>
+                <p>Wanna talk? Contact us @ <a href="mailto:mail@furry.institute">mail@furry.institute</a></p>
+                <p>uwu?</p>
+                <button onclick="openNetworkStatusDialog()" class="dialog-button">Network Status</button>
+                <button onclick="openSystemDebugDialog()" class="dialog-button">Debug tool</button>
+            </div>
+        </div>
+    </div>
+</body>
+</html>
